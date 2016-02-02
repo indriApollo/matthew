@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>nodejs player</title>
+</head>
+<body>
+	
+	<button onclick="toggle(this)">||</button>
+	<button onclick="loadList()">load list</button>
+	<input type="range" id="volume" min="0" max="100" oninput="volSlider(this)">
+
+	<ul id="listcontainer"></ul>
+
+	<script type="text/javascript">
+	function toggle(el) {
+		if(el.textContent == ">") {
+			el.textContent = "||";
+			pause();
+		} else {
+			el.textContent = ">";
+			pause();
+		}
+	}
+
+	function pause() {
+		httpGet("pause");
+	}
+
+	function play(m_id) {
+		httpGet("play/"+m_id);
+	}
+
+	function setVolume(vol) {
+		httpGet("volume/"+vol);
+	}
+
+	function volSlider(el) {
+		setVolume(el.value);
+	}
+
+	function loadList() {
+		var cont = document.getElementById("listcontainer");
+		httpGet("list", function(r){
+			for(var i in r) {
+				var name = r[i].name;
+				var m_id = btoa(name);
+
+				var li = document.createElement("li");
+				li.m_id = m_id;
+				li.onclick = function() {
+					play(this.m_id);
+				};
+				li.textContent = name;
+				cont.appendChild(li);
+			}
+		});
+
+	}
+
+	function httpGet(uri, callback) {
+		var url = "http://localhost:8888/"+uri;
+	    var xmlhttp = new XMLHttpRequest();
+	    xmlhttp.onreadystatechange = function() {
+	        if(xmlhttp.readyState == 4 || xmlhttp.status == 200) {
+	        	var r = xmlhttp.responseText;
+	            console.log(r);
+	            if(callback) callback(JSON.parse(r).message);
+	        }
+	    };
+	    xmlhttp.open("GET", url);
+	    xmlhttp.send();
+	}
+	</script>
+</body>
+</html>
