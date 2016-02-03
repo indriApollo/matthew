@@ -2,17 +2,45 @@
 <html>
 <head>
 	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 	<title>nodejs player</title>
+	<style type="text/css">
+	.controls {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 80px;
+		border-bottom: 3px solid black;
+		padding: 10px;
+	}
+	#listcontainer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		top: 103px;
+		overflow: scroll;
+		padding: 10px;
+	}
+	</style>
 </head>
 <body>
-	
-	<button onclick="toggle(this)">||</button>
-	<button onclick="loadList()">load list</button>
-	<input type="range" id="volume" min="0" max="100" oninput="volSlider(this)">
+	<div class="controls">
+		<button onclick="toggle(this)">||</button>
+		<input type="range" id="volume" min="0" max="100" oninput="volSlider(this)">
+		<input type="text" oninput="searchList(this.value)">
+		<p id="currentSongTitle"></p>
+	</div>
 
-	<ul id="listcontainer"></ul>
+	<div id="listcontainer"></div>
+
 
 	<script type="text/javascript">
+
+	var list = [];
+	var lock = 0;
+
 	function toggle(el) {
 		if(el.textContent == ">") {
 			el.textContent = "||";
@@ -21,6 +49,20 @@
 			el.textContent = ">";
 			pause();
 		}
+	}
+
+	function songTitleFromM_ID(m_id) {
+		var p = document.getElementById("currentSongTitle")
+		for(var i in list) {
+			if(list[i].m_id == m_id) {
+				songTitle(list[i].title);
+				break;
+			}
+		}
+	}
+
+	function songTitle(title) {
+		document.getElementById("currentSongTitle").textContent = title;
 	}
 
 	function pause() {
@@ -35,31 +77,134 @@
 		httpGet("volume/"+vol);
 	}
 
+	function getVolume() {
+		httpGet("volume", function(r){
+			document.getElementById("volume").value = r;
+		})
+	}
+
+	function getM_ID() {
+		httpGet("m_id", function(r){
+			songTitleFromM_ID(r);
+		})
+	}
+
 	function volSlider(el) {
 		setVolume(el.value);
 	}
 
-	function loadList() {
-		var cont = document.getElementById("listcontainer");
+	function loadList(callback) {
+		console.log("load list");
 		httpGet("list", function(r){
+			list = []; //clear
 			for(var i in r) {
 				var name = r[i].name;
 				var m_id = btoa(name);
-
-				var li = document.createElement("li");
-				li.m_id = m_id;
-				li.onclick = function() {
-					play(this.m_id);
+					
+				var meta = {
+					title: name.split("/").pop(),
+					artist: "unknown",
+					album: "unknown",
+					name: name,
+					m_id: m_id
 				};
-				li.textContent = name;
-				cont.appendChild(li);
+				var rmt = r[i].metadata;
+				if(rmt) {
+					if(rmt.title) meta.title = rmt.title;
+					if(rmt.artist && rmt.artist[0]) meta.artist = rmt.artist[0];
+					if(rmt.album) meta.album = rmt.album;
+				}
+				list[i] = meta;
 			}
+			if(callback) callback();
 		});
 
 	}
 
+	function sortListSimple() {
+
+		var cont = document.getElementById("listcontainer");
+		cont.innerHTML = ""; //clear
+		for(var i in list) {
+			var p = document.createElement("p");
+			p.m_id = list[i].m_id;
+			p.title = list[i].title
+			p.oncpck = function() {
+				play(this.m_id);
+				songTitle(this.title);
+			};
+			p.textContent = p.title;
+			cont.appendChild(p);
+		}
+	}
+
+	function sortListArtist() {
+
+		var cont = document.getElementById("listcontainer");
+		cont.innerHTML = ""; //clear
+		var artists = {};
+		for(var i in list) {
+			var artist = list[i].artist;
+			if(!artists[artist]) {
+				artists[artist] = document.createElement("ul");
+				var t = document.createElement("li");
+				t.innerHTML = "<b>"+artist+"</b>";
+				artists[artist].appendChild(t);
+			}
+			artists[artist].artist = artist;
+
+			var li = document.createElement("li");
+			li.m_id = list[i].m_id;
+			li.title = list[i].title;
+			li.onclick = function() {
+				play(this.m_id);
+				songTitle(this.title);
+			};
+			li.textContent = li.title;
+
+			artists[artist].appendChild(li);
+		}
+
+		for(var artist in artists) {
+			cont.appendChild(artists[artist])
+		}
+	}
+
+	function searchList(str) {
+
+		str = str.trim();
+		if(!str) {
+			sortListArtist();
+			return;
+		}
+
+		var cont = document.getElementById("listcontainer");
+		cont.innerHTML = ""; //clear
+		var ul = document.createElement("ul");
+		cont.appendChild(ul);
+
+		str = str.toUpperCase();
+		var ilock = ++lock;
+		for(var i in list) {
+			if(ilock != lock) return;
+			var artist = list[i].artist.toUpperCase();
+			var album = list[i].album.toUpperCase();
+			var title = list[i].title.toUpperCase();
+			if(artist.indexOf(str) > -1 || album.indexOf(str) > -1 || title.indexOf(str) > -1) {
+
+				var li = document.createElement("li");
+				li.m_id = list[i].m_id;
+				li.onclick = function() {
+					play(this.m_id);
+				};
+				li.textContent = list[i].title;
+				ul.appendChild(li);
+			}
+		}
+	}
+
 	function httpGet(uri, callback) {
-		var url = "http://localhost:8888/"+uri;
+		var url = "http://192.168.0.24:8888/"+uri;
 	    var xmlhttp = new XMLHttpRequest();
 	    xmlhttp.onreadystatechange = function() {
 	        if(xmlhttp.readyState == 4 && xmlhttp.status == 200) {
@@ -71,6 +216,12 @@
 	    xmlhttp.open("GET", url);
 	    xmlhttp.send();
 	}
+
+	//onload
+	getVolume();
+	loadList(sortListArtist);
+	getM_ID();
+
 	</script>
 </body>
 </html>

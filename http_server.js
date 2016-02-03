@@ -5,7 +5,8 @@ var http = require("http"),
     mm = require('musicmetadata'),
     Mplayer = require('./node-mplayer.js'),
     audio = new Mplayer(undefined),
-    __VOLUME__ = 50;
+    __VOLUME__ = 30,
+    __M_ID__ = "",
     port = process.argv[2] || 8888;
 
 
@@ -21,8 +22,8 @@ http.createServer(function(request, response) {
 
   switch(param[1]) {
     case 'play':
-      var mfile = atob(param[2]);
-      audio.setFile(mfile);
+      __M_ID__ = param[2];
+      audio.setFile( atob(__M_ID__) );
       audio.play({volume: __VOLUME__});
       jsonResp("playing");
       break;
@@ -34,7 +35,7 @@ http.createServer(function(request, response) {
       if(!param[2]) {
         audio.getVolume(function(r) {
           __VOLUME__ = r;
-          jsonResp("volume level is "+r);
+          jsonResp(r);
         });
       } else {
         if(!Number(param[2])) jsonResp("volume level must be a number");
@@ -49,6 +50,9 @@ http.createServer(function(request, response) {
       getList(function(r) {
         jsonResp(r);
       });
+      break;
+    case 'm_id':
+      jsonResp(__M_ID__);
       break;
     default:
       filename += '/index.html';
@@ -82,8 +86,9 @@ http.createServer(function(request, response) {
 
   function jsonResp(message) {
 
-    var jstr = {};
-    jstr.message = message;
+    var jstr = {
+      message: message
+    };
     jstr = JSON.stringify(jstr,null,2);
 
     response.writeHead(200, {"Content-Type": "application/json"});
@@ -94,7 +99,7 @@ http.createServer(function(request, response) {
 
 }).listen(parseInt(port, 10));
 
-function scanfsForAudioFiles(libdir, listdir, callback) {
+function scanfsForAudioFiles(libdir, listfile, callback) {
 
   //http://stackoverflow.com/a/31831122
   var results = [];
@@ -152,7 +157,7 @@ function scanfsForAudioFiles(libdir, listdir, callback) {
     if(err)
       console.error(err);
     else {
-      fs.writeFile(listdir, JSON.stringify(res,null,2) , function(err) {
+      fs.writeFile(listfile, JSON.stringify(res,null,2) , function(err) {
         if(err) {
           return console.log(err);
         }
@@ -163,8 +168,8 @@ function scanfsForAudioFiles(libdir, listdir, callback) {
 }
 
 var libdir = "/home/raphael/Musique",
-    listdir = "/tmp/musiclist.json";
-scanfsForAudioFiles(libdir, listdir, function() {
+    listfile = "/home/raphael/Musique/musiclist.json";
+scanfsForAudioFiles(libdir, listfile, function() {
   console.log("scan done");
 });
 
@@ -173,7 +178,7 @@ function atob(str) {
 }
 
 function getList(callback) {
-  fs.readFile(listdir, 'utf8', function (err,data) {
+  fs.readFile(listfile, 'utf8', function (err,data) {
   if (err) {
     console.log(err);
     callback(err);
@@ -182,5 +187,4 @@ function getList(callback) {
 });
 }
 
-console.log("Static file server running at\n  => http://localhost:" + 
-port + "/\nCTRL + C to shutdown");
+console.log("Server running at http://localhost:" + port);
