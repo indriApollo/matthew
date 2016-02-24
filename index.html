@@ -204,7 +204,7 @@
 	}
 
 	function httpGet(uri, callback) {
-		var url = "http://192.168.0.24:8888/"+uri;
+		var url = "http://localhost:8888/"+uri;
 	    var xmlhttp = new XMLHttpRequest();
 	    xmlhttp.onreadystatechange = function() {
 	        if(xmlhttp.readyState == 4 && xmlhttp.status == 200) {
